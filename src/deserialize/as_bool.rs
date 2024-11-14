@@ -1,9 +1,7 @@
 use serde::de::{Deserializer, Error, Expected, Unexpected, Visitor};
 use std::fmt;
 
-const NUMBER_EXP: &dyn Expected = &"0 or 1";
-const STRING_EXP: &dyn Expected = &"true/false, yes/no, y/n, t/f, 1/0, on/off, ok";
-const GLOBAL_EXP: &str = "an integer (0 or 1) or a case insensitive string (true/false, yes/no, on/off, y/n, t/f, 1/0, ok)";
+const EXPECTED: &dyn Expected = &"an integer (0 or 1) or a case insensitive string (true/false, yes/no, on/off, y/n, t/f, 1/0, ok)";
 
 pub fn as_bool<'de, D: Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
     deserializer.deserialize_any(Convertor)
@@ -15,7 +13,7 @@ impl<'de> Visitor<'de> for Convertor {
     type Value = bool;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(GLOBAL_EXP)
+        formatter.write_str(EXPECTED.to_string().as_str())
     }
 
     fn visit_bool<E: Error>(self, v: bool) -> Result<Self::Value, E> {
@@ -26,7 +24,7 @@ impl<'de> Visitor<'de> for Convertor {
         match v {
             0 => Ok(false),
             1 => Ok(true),
-            other => Err(Error::invalid_value(Unexpected::Signed(other), NUMBER_EXP)),
+            other => Err(Error::invalid_value(Unexpected::Signed(other), EXPECTED)),
         }
     }
 
@@ -34,7 +32,7 @@ impl<'de> Visitor<'de> for Convertor {
         match v {
             0 => Ok(false),
             1 => Ok(true),
-            other => Err(Error::invalid_value(Unexpected::Unsigned(other), NUMBER_EXP)),
+            other => Err(Error::invalid_value(Unexpected::Unsigned(other), EXPECTED)),
         }
     }
 
@@ -46,7 +44,7 @@ impl<'de> Visitor<'de> for Convertor {
                 match other.to_lowercase().as_str() {
                     "true" | "yes" | "on" | "y" | "t" | "ok" => Ok(true),
                     "false" | "no" | "off" | "n" | "f" => Ok(false),
-                    _ => Err(Error::invalid_value(Unexpected::Str(v), STRING_EXP)),
+                    _ => Err(Error::invalid_value(Unexpected::Str(v), EXPECTED)),
                 }
             }
         }
@@ -122,6 +120,9 @@ mod tests {
 
     #[test]
     fn test_parse_error_message() {
-        assert!(serde_json::from_str::<Test>(r#"{"bool": null}"#).unwrap_err().to_string().contains(GLOBAL_EXP));
+        assert!(serde_json::from_str::<Test>(r#"{"bool": null}"#).unwrap_err().to_string().contains(EXPECTED.to_string().as_str()));
+        assert!(serde_json::from_str::<Test>(r#"{"bool": ["first", "second"]}"#).unwrap_err().to_string().contains(EXPECTED.to_string().as_str()));
+        assert!(serde_json::from_str::<Test>(r#"{"bool": -100}"#).unwrap_err().to_string().contains(EXPECTED.to_string().as_str()));
+        assert!(serde_json::from_str::<Test>(r#"{"bool": "unknown"}"#).unwrap_err().to_string().contains(EXPECTED.to_string().as_str()));
     }
 }
