@@ -7,7 +7,7 @@ authors = [
 description = "Custom deserialization for fields that can be specified as multiple types."
 documentation = "https://github.com/anton-panfilov/serde-flexible"
 repository = "https://github.com/anton-panfilov/serde-flexible"
-readme = "README.md"
+readme = "../README.md"
 keywords = [
     "serde",
     "flxablilty",
