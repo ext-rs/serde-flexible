@@ -12,12 +12,6 @@
 
 ---
 
-## **Use Case**
-
-If you have many clients who may provide input data in inconsistent formats (e.g., sending an integer instead of a string), `serde-flexible` lets you handle these cases gracefully by converting types where possible.
-
----
-
 ## **Example**
 
 ```rust
@@ -36,7 +30,10 @@ struct Message {
 #[test]
 fn test_base_good_parse() {
     assert_eq!(
-        serde_json::from_str::<Message>(r#"{"owner": "8a8cc628-88e3-4550-90c0-a64bd8f446dd", "referral": 7132}"#).unwrap(),
+        serde_json::from_str::<Message>(r#"{
+            "owner": "8a8cc628-88e3-4550-90c0-a64bd8f446dd", 
+            "referral": 7132,
+        }"#).unwrap(),
         Message {
             owner: "8a8cc628-88e3-4550-90c0-a64bd8f446dd".to_string(),
             referral: Some("7132".to_string())
@@ -45,6 +42,7 @@ fn test_base_good_parse() {
 }
 ```
 
+---
 
 ## **All Possible Deserializers**
 
