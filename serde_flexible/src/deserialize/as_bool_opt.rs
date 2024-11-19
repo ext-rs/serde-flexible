@@ -1,60 +1,26 @@
-use serde::de::{Deserializer, Error, Expected, Unexpected, Visitor};
+use super::as_bool;
+use crate::deserialize::wrappers::str_wrap_as_opt;
+use serde::de::{Deserializer, Error, Visitor};
 use std::fmt;
 
-const EXPECTED: &dyn Expected = &"null or an integer (0 or 1) or a case insensitive string (true/false, yes/no, y/n, t/f, 1/0, on/off, ok)";
+const EXPECTED: &str = "null or an integer (0 or 1) or a case insensitive string (true/false, yes/no, y/n, t/f, 1/0, on/off, ok, null, none, unknown)";
 
 pub fn as_bool_opt<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<bool>, D::Error> {
-    deserializer.deserialize_any(Convertor)
+    deserializer.deserialize_any(AsOptBool)
 }
 
-struct Convertor;
+struct AsOptBool;
 
-impl<'de> Visitor<'de> for Convertor {
+impl<'de> Visitor<'de> for AsOptBool {
     type Value = Option<bool>;
 
-    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(EXPECTED.to_string().as_str())
-    }
-
-    fn visit_bool<E: Error>(self, v: bool) -> Result<Self::Value, E> {
-        Ok(Some(v))
-    }
-
-    fn visit_i64<E: Error>(self, v: i64) -> Result<Self::Value, E> {
-        match v {
-            0 => Ok(Some(false)),
-            1 => Ok(Some(true)),
-            other => Err(Error::invalid_value(Unexpected::Signed(other), EXPECTED)),
-        }
-    }
-
-    fn visit_u64<E: Error>(self, v: u64) -> Result<Self::Value, E> {
-        match v {
-            0 => Ok(Some(false)),
-            1 => Ok(Some(true)),
-            other => Err(Error::invalid_value(Unexpected::Unsigned(other), EXPECTED)),
-        }
-    }
-
-    fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
-        match v {
-            "1" | "true" | "True" => Ok(Some(true)),
-            "0" | "false" | "False" => Ok(Some(false)),
-            other => {
-                match other.to_lowercase().as_str() {
-                    "true" | "yes" | "on" | "y" | "t" | "ok" => Ok(Some(true)),
-                    "false" | "no" | "off" | "n" | "f" => Ok(Some(false)),
-                    _ => Err(Error::invalid_value(Unexpected::Str(v), EXPECTED)),
-                }
-            }
-        }
-    }
-
-    fn visit_unit<E: Error>(self) -> Result<Self::Value, E> {
-        Ok(None)
-    }
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result { formatter.write_str(EXPECTED) }
+    fn visit_bool<E: Error>(self, v: bool) -> Result<Self::Value, E> { Ok(v).map(Some) }
+    fn visit_i64<E: Error>(self, v: i64) -> Result<Self::Value, E> { as_bool::parse_i64(v, &EXPECTED).map(Some) }
+    fn visit_u64<E: Error>(self, v: u64) -> Result<Self::Value, E> { as_bool::parse_u64(v, &EXPECTED).map(Some) }
+    fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> { str_wrap_as_opt(v, &EXPECTED, as_bool::parse_str) }
+    fn visit_unit<E: Error>(self) -> Result<Self::Value, E> { Ok(None) }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -85,7 +51,14 @@ mod tests {
 
     #[test]
     fn test_base_good_parse() {
-        assert!(serde_json::from_str::<Test>(r#"{"bool": null     }"#).unwrap().bool.is_none());
+        assert!(serde_json::from_str::<Test>(r#"{"bool": null      }"#).unwrap().bool.is_none());
+        assert!(serde_json::from_str::<Test>(r#"{"bool": "null"    }"#).unwrap().bool.is_none());
+        assert!(serde_json::from_str::<Test>(r#"{"bool": "Null"    }"#).unwrap().bool.is_none());
+        assert!(serde_json::from_str::<Test>(r#"{"bool": "NULL"    }"#).unwrap().bool.is_none());
+        assert!(serde_json::from_str::<Test>(r#"{"bool": "none"    }"#).unwrap().bool.is_none());
+        assert!(serde_json::from_str::<Test>(r#"{"bool": "unknown" }"#).unwrap().bool.is_none());
+        assert!(serde_json::from_str::<Test>(r#"{"bool": "Unknown" }"#).unwrap().bool.is_none());
+
         assert!(serde_json::from_str::<Test>(r#"{"bool": true     }"#).unwrap().bool.unwrap());
         assert!(serde_json::from_str::<Test>(r#"{"bool": 1        }"#).unwrap().bool.unwrap());
         assert!(serde_json::from_str::<Test>(r#"{"bool": "1"      }"#).unwrap().bool.unwrap());
@@ -147,8 +120,8 @@ mod tests {
 
     #[test]
     fn test_parse_error_message() {
-        assert!(serde_json::from_str::<Test>(r#"{"bool": ["first", "second"]}"#).unwrap_err().to_string().contains(EXPECTED.to_string().as_str()));
-        assert!(serde_json::from_str::<Test>(r#"{"bool": -100}"#).unwrap_err().to_string().contains(EXPECTED.to_string().as_str()));
-        assert!(serde_json::from_str::<Test>(r#"{"bool": "unknown"}"#).unwrap_err().to_string().contains(EXPECTED.to_string().as_str()));
+        assert!(serde_json::from_str::<Test>(r#"{"bool": ["first", "second"]}"#).unwrap_err().to_string().contains(EXPECTED));
+        assert!(serde_json::from_str::<Test>(r#"{"bool": -100}"#).unwrap_err().to_string().contains(EXPECTED));
+        assert!(serde_json::from_str::<Test>(r#"{"bool": "some_str"}"#).unwrap_err().to_string().contains(EXPECTED));
     }
 }

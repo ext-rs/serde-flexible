@@ -1,51 +1,49 @@
 use serde::de::{Deserializer, Error, Expected, Unexpected, Visitor};
 use std::fmt;
 
-const EXPECTED: &dyn Expected = &"an integer (0 or 1) or a case insensitive string (true/false, yes/no, on/off, y/n, t/f, 1/0, ok)";
+const EXPECTED: &str = "an integer (0 or 1) or a case insensitive string (true/false, yes/no, on/off, y/n, t/f, 1/0, ok)";
 
 pub fn as_bool<'de, D: Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
-    deserializer.deserialize_any(Convertor)
+    deserializer.deserialize_any(AsBool)
 }
 
-struct Convertor;
+struct AsBool;
 
-impl<'de> Visitor<'de> for Convertor {
+impl<'de> Visitor<'de> for AsBool {
     type Value = bool;
 
-    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(EXPECTED.to_string().as_str())
-    }
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result { formatter.write_str(EXPECTED) }
+    fn visit_bool<E: Error>(self, v: bool) -> Result<Self::Value, E> { Ok(v) }
+    fn visit_i64<E: Error>(self, v: i64) -> Result<Self::Value, E> { parse_i64(v, &EXPECTED) }
+    fn visit_u64<E: Error>(self, v: u64) -> Result<Self::Value, E> { parse_u64(v, &EXPECTED) }
+    fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> { parse_str(v, &EXPECTED) }
+}
 
-    fn visit_bool<E: Error>(self, v: bool) -> Result<Self::Value, E> {
-        Ok(v)
+pub(super) fn parse_i64<E: Error>(v: i64, exp: &dyn Expected) -> Result<bool, E> {
+    match v {
+        0 => Ok(false),
+        1 => Ok(true),
+        _ => Err(Error::invalid_value(Unexpected::Signed(v), exp)),
     }
+}
 
-    fn visit_i64<E: Error>(self, v: i64) -> Result<Self::Value, E> {
-        match v {
-            0 => Ok(false),
-            1 => Ok(true),
-            other => Err(Error::invalid_value(Unexpected::Signed(other), EXPECTED)),
-        }
+pub(super) fn parse_u64<E: Error>(v: u64, exp: &dyn Expected) -> Result<bool, E> {
+    match v {
+        0 => Ok(false),
+        1 => Ok(true),
+        _ => Err(Error::invalid_value(Unexpected::Unsigned(v), exp)),
     }
+}
 
-    fn visit_u64<E: Error>(self, v: u64) -> Result<Self::Value, E> {
-        match v {
-            0 => Ok(false),
-            1 => Ok(true),
-            other => Err(Error::invalid_value(Unexpected::Unsigned(other), EXPECTED)),
-        }
-    }
-
-    fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
-        match v {
-            "1" | "true" | "True" => Ok(true),
-            "0" | "false" | "False" => Ok(false),
-            other => {
-                match other.to_lowercase().as_str() {
-                    "true" | "yes" | "on" | "y" | "t" | "ok" => Ok(true),
-                    "false" | "no" | "off" | "n" | "f" => Ok(false),
-                    _ => Err(Error::invalid_value(Unexpected::Str(v), EXPECTED)),
-                }
+pub(super) fn parse_str<E: Error>(v: &str, exp: &dyn Expected) -> Result<bool, E> {
+    match v {
+        "1" | "true" | "True" => Ok(true),
+        "0" | "false" | "False" => Ok(false),
+        _ => {
+            match v.to_lowercase().as_str() {
+                "true" | "yes" | "on" | "y" | "t" | "ok" => Ok(true),
+                "false" | "no" | "off" | "n" | "f" => Ok(false),
+                _ => Err(Error::invalid_value(Unexpected::Str(v), exp)),
             }
         }
     }
@@ -94,17 +92,17 @@ mod tests {
         assert!(!serde_json::from_str::<Test>(r#"{"bool": "False" }"#).unwrap().bool);
         assert!(!serde_json::from_str::<Test>(r#"{"bool": "FalsE" }"#).unwrap().bool);
         assert!(!serde_json::from_str::<Test>(r#"{"bool": "FALSE" }"#).unwrap().bool);
-        assert!(!serde_json::from_str::<Test>(r#"{"bool": "no"   }"#).unwrap().bool);
-        assert!(!serde_json::from_str::<Test>(r#"{"bool": "NO"   }"#).unwrap().bool);
-        assert!(!serde_json::from_str::<Test>(r#"{"bool": "nO"   }"#).unwrap().bool);
-        assert!(!serde_json::from_str::<Test>(r#"{"bool": "No"   }"#).unwrap().bool);
+        assert!(!serde_json::from_str::<Test>(r#"{"bool": "no"    }"#).unwrap().bool);
+        assert!(!serde_json::from_str::<Test>(r#"{"bool": "NO"    }"#).unwrap().bool);
+        assert!(!serde_json::from_str::<Test>(r#"{"bool": "nO"    }"#).unwrap().bool);
+        assert!(!serde_json::from_str::<Test>(r#"{"bool": "No"    }"#).unwrap().bool);
         assert!(!serde_json::from_str::<Test>(r#"{"bool": "off"   }"#).unwrap().bool);
         assert!(!serde_json::from_str::<Test>(r#"{"bool": "Off"   }"#).unwrap().bool);
         assert!(!serde_json::from_str::<Test>(r#"{"bool": "OfF"   }"#).unwrap().bool);
-        assert!(!serde_json::from_str::<Test>(r#"{"bool": "n"   }"#).unwrap().bool);
-        assert!(!serde_json::from_str::<Test>(r#"{"bool": "N"   }"#).unwrap().bool);
-        assert!(!serde_json::from_str::<Test>(r#"{"bool": "f"   }"#).unwrap().bool);
-        assert!(!serde_json::from_str::<Test>(r#"{"bool": "F"   }"#).unwrap().bool);
+        assert!(!serde_json::from_str::<Test>(r#"{"bool": "n"     }"#).unwrap().bool);
+        assert!(!serde_json::from_str::<Test>(r#"{"bool": "N"     }"#).unwrap().bool);
+        assert!(!serde_json::from_str::<Test>(r#"{"bool": "f"     }"#).unwrap().bool);
+        assert!(!serde_json::from_str::<Test>(r#"{"bool": "F"     }"#).unwrap().bool);
     }
 
     #[test]
@@ -120,9 +118,9 @@ mod tests {
 
     #[test]
     fn test_parse_error_message() {
-        assert!(serde_json::from_str::<Test>(r#"{"bool": null}"#).unwrap_err().to_string().contains(EXPECTED.to_string().as_str()));
-        assert!(serde_json::from_str::<Test>(r#"{"bool": ["first", "second"]}"#).unwrap_err().to_string().contains(EXPECTED.to_string().as_str()));
-        assert!(serde_json::from_str::<Test>(r#"{"bool": -100}"#).unwrap_err().to_string().contains(EXPECTED.to_string().as_str()));
-        assert!(serde_json::from_str::<Test>(r#"{"bool": "unknown"}"#).unwrap_err().to_string().contains(EXPECTED.to_string().as_str()));
+        assert!(serde_json::from_str::<Test>(r#"{"bool": null}"#).unwrap_err().to_string().contains(EXPECTED));
+        assert!(serde_json::from_str::<Test>(r#"{"bool": ["first", "second"]}"#).unwrap_err().to_string().contains(EXPECTED));
+        assert!(serde_json::from_str::<Test>(r#"{"bool": -100}"#).unwrap_err().to_string().contains(EXPECTED));
+        assert!(serde_json::from_str::<Test>(r#"{"bool": "unknown"}"#).unwrap_err().to_string().contains(EXPECTED));
     }
 }
