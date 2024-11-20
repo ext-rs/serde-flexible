@@ -5,8 +5,8 @@ authors = [
     "Anton Panfilov <anton@panfilov.biz>"
 ]
 description = "Custom deserialization for fields that can be specified as multiple types."
-documentation = "https://github.com/anton-panfilov/serde-flexible"
-repository = "https://github.com/anton-panfilov/serde-flexible"
+documentation = "https://github.com/ext-rs/serde-flexible"
+repository = "https://github.com/ext-rs/serde-flexible"
 readme = "../README.md"
 keywords = [
     "serde",
